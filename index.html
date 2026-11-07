@@ -398,7 +398,7 @@
       });
 
       // Ambil dari Rekap_Harian jika ada data spend/leads di sana
-      rawData.rekap_harian.forEach(row => {
+     rawData.rekap_harian.forEach(row => {
         const rawDate = row.Tanggal || row.Waktu_Update || "";
         const dObj = parseSheetDate(rawDate);
         if (!isWithinPeriod(dObj, currentPeriod)) return;
@@ -407,11 +407,15 @@
         if (!dailyMap[dateKey]) {
           dailyMap[dateKey] = { dateObj: dObj, spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0, closing: 0 };
         }
-        // Gunakan nilai dari Rekap_Harian jika di Rekap_Monitor belum terisi
-        if (dailyMap[dateKey].spend === 0) dailyMap[dateKey].spend += parseNumber(row.Total_Spend || row.Spend_Hari_Ini || row.Spend);
-        if (dailyMap[dateKey].reach === 0) dailyMap[dateKey].reach += parseNumber(row.Reach);
-        dailyMap[dateKey].leads += parseNumber(row.Leads_Masuk || row.Total_Leads || row.Leads_WA_Masuk);
-        dailyMap[dateKey].closing += parseNumber(row.Total_Closing || row.Closing);
+        
+        // Membaca nama kolom persis seperti yang ada di tab Rekap_Harian Anda
+        const leadsVal = row.Total_Leads_WA !== undefined ? row.Total_Leads_WA : (row.Leads_Masuk || row.Total_Leads || 0);
+        const closingVal = row.Jumlah_Closing !== undefined ? row.Jumlah_Closing : (row.Total_Closing || row.Closing || 0);
+
+        dailyMap[dateKey].spend += parseNumber(row.Total_Spend || row.Spend_Hari_Ini || row.Spend);
+        dailyMap[dateKey].reach += parseNumber(row.Reach);
+        dailyMap[dateKey].leads += parseNumber(leadsVal);
+        dailyMap[dateKey].closing += parseNumber(closingVal);
       });
 
       // Filter Leads WA sesuai periode
