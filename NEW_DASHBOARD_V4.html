@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan Performa Meta Ads (FB/IG) & LEADS WA</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2pdf.js untuk Download PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .editable-box:focus { outline: 2px solid #3b82f6; background-color: #ffffff; }
+    @media print {
+      .no-print { display: none !important; }
+    }
+    .pdf-export-mode .no-print { display: none !important; }
+  </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+  <!-- CONTROL BAR (TIDAK IKUT TERCETAK DI PDF) -->
+  <div id="controlBar" class="no-print max-w-6xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+    <!-- Filter Tanggal -->
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">Filter Periode:</span>
+      <button onclick="setPeriod('today')" id="btn-today" class="period-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition">Hari Ini</button>
+      <button onclick="setPeriod('7d')" id="btn-7d" class="period-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition">7 Hari</button>
+      <button onclick="setPeriod('30d')" id="btn-30d" class="period-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition">1 Bulan</button>
+      <button onclick="fetchDataFromSheet()" class="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition ml-1" title="Refresh Data">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Pilihan Download PDF -->
+    <div class="flex items-center gap-2">
+      <select id="pdfExportType" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-300 text-slate-700 focus:outline-none focus:border-blue-500">
+        <option value="all">Download: Semua Bagian</option>
+        <option value="report_chart">Download: Hasil Laporan & Grafik</option>
+        <option value="leads_only">Download: Daftar List WA Saja</option>
+      </select>
+      <button onclick="downloadPDF()" class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition">
+        <i data-lucide="file-down" class="w-4 h-4"></i>
+        Unduh PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTAINER UTAMA LAPORAN (AREA CETAK PDF) -->
+  <div id="reportArea" class="max-w-6xl mx-auto bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/90 space-y-8">
+
+    <!-- HEADER LAPORAN -->
+    <div id="sectionHeader" class="border-b border-slate-200 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-2">
+          <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
+          DASHBOARD ANALITIK TERINTEGRASI
+        </div>
+        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Laporan Performa Meta Ads (FB/IG) & LEADS WA
+        </h1>
+      </div>
+      <div class="bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80 text-xs space-y-1 min-w-[240px]">
+        <div class="flex justify-between">
+          <span class="text-slate-500 font-medium">Periode Laporan:</span>
+          <span id="labelPeriode" class="font-bold text-slate-800">7 Hari Terakhir</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500 font-medium">Terakhir Diperbarui:</span>
+          <span id="labelLastUpdated" class="font-semibold text-emerald-600">Memuat...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BAGIAN 1: HASIL LAPORAN & GRAFIK -->
+    <div id="sectionReportAndChart" class="space-y-8">
+      
+      <!-- 4 KOTAK KPI UTAMA -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Kotak 1: Total Biaya Iklan (Spend) -->
+        <div class="bg-slate-50/70 rounded-2xl p-5 border border-slate-200/80">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Biaya Iklan (Spend)</span>
+            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+              <i data-lucide="wallet" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div id="kpiSpend" class="text-2xl font-extrabold text-slate-900">Rp 0</div>
+          <p class="text-[11px] text-slate-500 mt-1">Akumulasi pengeluaran Meta Ads</p>
+        </div>
+
+        <!-- Kotak 2: Total Leads Masuk WA -->
+        <div class="bg-slate-50/70 rounded-2xl p-5 border border-slate-200/80">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Leads Masuk WA</span>
+            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <i data-lucide="message-circle" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div id="kpiLeads" class="text-2xl font-extrabold text-slate-900">0</div>
+          <p id="kpiCPL" class="text-[11px] text-emerald-600 font-semibold mt-1">CPL: Rp 0 / lead</p>
+        </div>
+
+        <!-- Kotak 3: Total Closing -->
+        <div class="bg-slate-50/70 rounded-2xl p-5 border border-slate-200/80">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Closing</span>
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <i data-lucide="award" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div id="kpiClosing" class="text-2xl font-extrabold text-slate-900">0</div>
+          <p id="kpiConvRate" class="text-[11px] text-amber-600 font-semibold mt-1">Rasio Konversi: 0%</p>
+        </div>
+
+        <!-- Kotak 4: Total Jangkauan Tayangan -->
+        <div class="bg-slate-50/70 rounded-2xl p-5 border border-slate-200/80">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Jangkauan Tayangan</span>
+            <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+              <i data-lucide="eye" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div id="kpiReach" class="text-2xl font-extrabold text-slate-900">0</div>
+          <p id="kpiImpressions" class="text-[11px] text-slate-500 mt-1">Impresi: 0 tayangan</p>
+        </div>
+      </div>
+
+      <!-- BAGAN GRAFIK HARIAN LEADS WA VS JUMLAH CLOSING -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 border-b border-slate-100">
+          <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600">Sumber: Tab `Rekap_Harian`</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">Grafik Harian Leads WA vs Jumlah Closing</h2>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-medium text-slate-500">
+            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Leads Masuk</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-slate-900"></span>Closing</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>Closing Rate (%)</span>
+          </div>
+        </div>
+        
+        <div class="relative h-64 sm:h-72 w-full">
+          <canvas id="chartLeadsClosing"></canvas>
+        </div>
+
+        <!-- KETERANGAN RINGKASAN OTOMATIS & CATATAN YANG BISA DIUBAH -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+          <!-- Ringkasan Singkat Otomatis -->
+          <div class="bg-blue-50/60 rounded-xl p-4 border border-blue-100">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-blue-800 mb-1.5">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              Ringkasan Performa Otomatis
+            </div>
+            <p id="autoSummaryText" class="text-xs text-slate-700 leading-relaxed">
+              Memuat ringkasan analitik...
+            </p>
+          </div>
+
+          <!-- Catatan Evaluasi yang Bisa Diubah Langsung -->
+          <div class="bg-amber-50/60 rounded-xl p-4 border border-amber-200/80">
+            <div class="flex items-center justify-between text-xs font-bold text-amber-900 mb-1.5">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                Catatan & Evaluasi Tim (Klik untuk Mengubah)
+              </span>
+              <span class="text-[10px] font-normal text-amber-700 no-print">Tersimpan Otomatis</span>
+            </div>
+            <div id="editableNotes" contenteditable="true" oninput="saveCustomNotes()" class="editable-box text-xs text-slate-800 leading-relaxed min-h-[48px] p-1.5 rounded-lg transition">
+              Tambahkan catatan evaluasi kampanye iklan, kualitas prospek WA, atau tindak lanjut tim CS di sini...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABEL 1: DETAIL REKAP HARIAN LEADS & CLOSING (+ MONITOR IKLAN) -->
+      <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Detail Rekap Harian Leads & Closing</h2>
+            <p class="text-xs text-slate-500">Rincian metrik harian dari Rekap Harian & Rekap Monitor Iklan</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase tracking-wider">
+                <th class="py-3.5 px-4">Tanggal</th>
+                <th class="py-3.5 px-4 text-right">Biaya Iklan (Spend)</th>
+                <th class="py-3.5 px-4 text-right">Jangkauan (Reach)</th>
+                <th class="py-3.5 px-4 text-center">Klik Link</th>
+                <th class="py-3.5 px-4 text-center">Leads Masuk WA</th>
+                <th class="py-3.5 px-4 text-center">Jumlah Closing</th>
+                <th class="py-3.5 px-4 text-right">Biaya / Lead (CPL)</th>
+              </tr>
+            </thead>
+            <tbody id="tableRekapHarianBody" class="divide-y divide-slate-200/70">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-400">Memuat data rekap harian...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div> <!-- END SECTION REPORT & CHART -->
+
+    <!-- BAGIAN 2: DAFTAR PROSPEK MASUK WHATSAPP -->
+    <div id="sectionLeadsWA" class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-teal-600">Log Webhook Fonnte & Update CS</span>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900">Daftar Prospek Masuk WhatsApp (`Leads_WA`)</h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span id="badgeCountLeads" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">0 Prospek</span>
+          <div class="relative no-print">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input
+              id="leadSearchInput"
+              type="text"
+              oninput="renderTableLeadsWA()"
+              placeholder="Cari nama, nomor WA, kode..."
+              class="pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          <select id="leadStatusFilter" onchange="renderTableLeadsWA()" class="no-print bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 focus:outline-none">
+            <option value="all">Semua Status</option>
+            <option value="Baru Masuk">Baru Masuk</option>
+            <option value="Follow Up 1">Follow Up 1</option>
+            <option value="Follow Up 2">Follow Up 2</option>
+            <option value="Hot Prospect">Hot Prospect</option>
+            <option value="Closing">Closing</option>
+            <option value="Gagal">Gagal</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th class="py-3.5 px-4">ID & Waktu</th>
+              <th class="py-3.5 px-4">Nama Prospek & Nomor WA</th>
+              <th class="py-3.5 px-4">Kode Iklan</th>
+              <th class="py-3.5 px-4">Pesan Sapaan Awal</th>
+              <th class="py-3.5 px-4 text-center">Status Follow-Up</th>
+              <th class="py-3.5 px-4">Catatan CS</th>
+            </tr>
+          </thead>
+          <tbody id="tableLeadsWABody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400">Memuat daftar prospek WhatsApp...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // =========================================================================
+    // TEMPELKAN URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA DI BAWAH INI:
+    // =========================================================================
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwMst1MkiRz_bmm2B7PNdvZZtnnaXzzwjg9-2fmW5DFOO5jXQwCQ3c702uq07isoINAuw/exec";
+
+    let rawData = {
+      rekap_monitor: [],
+      rekap_harian: [],
+      monitor_aktif: [],
+      leads_wa: []
+    };
+
+    let currentPeriod = '7d';
+    let leadsChartInstance = null;
+    let currentFilteredLeads = [];
+
+    // Muat catatan tersimpan dari LocalStorage
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedNotes = localStorage.getItem('dashboard_custom_notes');
+      if (savedNotes) {
+        document.getElementById('editableNotes').innerText = savedNotes;
+      }
+      fetchDataFromSheet();
+    });
+
+    function saveCustomNotes() {
+      const notes = document.getElementById('editableNotes').innerText;
+      localStorage.setItem('dashboard_custom_notes', notes);
+    }
+
+    function parseNumber(val) {
+      if (typeof val === 'number') return val;
+      if (!val) return 0;
+      const cleaned = String(val).replace(/[^0-9,-]+/g, "").replace(",", ".");
+      return parseFloat(cleaned) || 0;
+    }
+
+    function formatRupiah(num) {
+      return "Rp " + Math.round(num).toLocaleString('id-ID');
+    }
+
+    // Parsing berbagai format tanggal dari Google Sheet (DD/MM/YYYY, YYYY-MM-DD, atau ISO)
+    function parseSheetDate(dateVal) {
+      if (!dateVal) return null;
+      let str = String(dateVal).replace(" (Backfill)", "").trim();
+      
+      // Format DD/MM/YYYY
+      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (dmyMatch) {
+        return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1]));
+      }
+      // Format YYYY-MM-DD atau ISO
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+      }
+      return null;
+    }
+
+    function isWithinPeriod(dateObj, period) {
+      if (!dateObj) return true;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.floor((today - dateObj) / (1000 * 60 * 60 * 24));
+
+      if (period === 'today') return diffDays === 0;
+      if (period === '7d') return diffDays >= 0 && diffDays < 7;
+      if (period === '30d') return diffDays >= 0 && diffDays < 30;
+      return true;
+    }
+
+    function setPeriod(period) {
+      currentPeriod = period;
+      document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.className = "period-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition";
+      });
+      document.getElementById('btn-' + period).className = "period-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition";
+
+      const labelMap = {
+        'today': 'Hari Ini',
+        '7d': '7 Hari Terakhir',
+        '30d': '1 Bulan Terakhir (30 Hari)'
+      };
+      document.getElementById('labelPeriode').textContent = labelMap[period];
+      renderDashboard();
+    }
+
+    async function fetchDataFromSheet() {
+      document.getElementById('labelLastUpdated').textContent = "Menyinkronkan...";
+      try {
+        const res = await fetch(WEB_APP_URL);
+        const json = await res.json();
+        rawData.rekap_monitor = json.rekap_monitor || [];
+        rawData.rekap_harian = json.rekap_harian || [];
+        rawData.monitor_aktif = json.monitor_aktif || [];
+        rawData.leads_wa = json.leads_wa || [];
+
+        document.getElementById('labelLastUpdated').textContent = json.last_updated || new Date().toLocaleString('id-ID');
+        renderDashboard();
+      } catch (err) {
+        console.warn("Gagal mengambil dari URL atau URL belum dipasang, menampilkan contoh struktur data.", err);
+        document.getElementById('labelLastUpdated').textContent = "Mode Pratinjau (Pasang URL Apps Script)";
+        loadSampleFallbackData();
+        renderDashboard();
+      }
+    }
+
+    function renderDashboard() {
+      // 1. Gabungkan dan agregasi metrik per tanggal
+      const dailyMap = {};
+
+      // Ambil dari Rekap_Monitor_Iklan (atau Monitor_Iklan_Aktif jika hari ini)
+      const sumberMonitor = (rawData.rekap_monitor.length > 0) ? rawData.rekap_monitor : rawData.monitor_aktif;
+      sumberMonitor.forEach(row => {
+        const rawDate = row.Waktu_Update || row.Tanggal || "";
+        const dObj = parseSheetDate(rawDate);
+        if (!isWithinPeriod(dObj, currentPeriod)) return;
+
+        const dateKey = dObj ? dObj.toISOString().split('T')[0] : "Hari Ini";
+        if (!dailyMap[dateKey]) {
+          dailyMap[dateKey] = { dateObj: dObj, spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0, closing: 0 };
+        }
+        dailyMap[dateKey].spend += parseNumber(row.Spend_Hari_Ini || row.Total_Spend || row.Spend);
+        dailyMap[dateKey].reach += parseNumber(row.Reach);
+        dailyMap[dateKey].impressions += parseNumber(row.Impressions);
+        dailyMap[dateKey].clicks += parseNumber(row.Link_Clicks);
+      });
+
+      // Ambil dari Rekap_Harian jika ada data spend/leads di sana
+      rawData.rekap_harian.forEach(row => {
+        const rawDate = row.Tanggal || row.Waktu_Update || "";
+        const dObj = parseSheetDate(rawDate);
+        if (!isWithinPeriod(dObj, currentPeriod)) return;
+
+        const dateKey = dObj ? dObj.toISOString().split('T')[0] : "Hari Ini";
+        if (!dailyMap[dateKey]) {
+          dailyMap[dateKey] = { dateObj: dObj, spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0, closing: 0 };
+        }
+        // Gunakan nilai dari Rekap_Harian jika di Rekap_Monitor belum terisi
+        if (dailyMap[dateKey].spend === 0) dailyMap[dateKey].spend += parseNumber(row.Total_Spend || row.Spend_Hari_Ini || row.Spend);
+        if (dailyMap[dateKey].reach === 0) dailyMap[dateKey].reach += parseNumber(row.Reach);
+        dailyMap[dateKey].leads += parseNumber(row.Leads_Masuk || row.Total_Leads || row.Leads_WA_Masuk);
+        dailyMap[dateKey].closing += parseNumber(row.Total_Closing || row.Closing);
+      });
+
+      // Filter Leads WA sesuai periode
+      const filteredLeads = rawData.leads_wa.filter(row => {
+        const rawDate = row.Waktu_Masuk || row.Tanggal || row.Timestamp || Object.values(row)[0];
+        const dObj = parseSheetDate(rawDate);
+        return isWithinPeriod(dObj, currentPeriod);
+      });
+
+      // Jika di Rekap_Harian kolom leads belum terhitung, hitung langsung dari tab Leads_WA per tanggal
+      filteredLeads.forEach(row => {
+        const rawDate = row.Waktu_Masuk || row.Tanggal || row.Timestamp || Object.values(row)[0];
+        const dObj = parseSheetDate(rawDate);
+        const dateKey = dObj ? dObj.toISOString().split('T')[0] : "Hari Ini";
+        if (!dailyMap[dateKey]) {
+          dailyMap[dateKey] = { dateObj: dObj, spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0, closing: 0 };
+        }
+        // Hitung jika belum disuplai Rekap_Harian
+        if (rawData.rekap_harian.length === 0) {
+          dailyMap[dateKey].leads += 1;
+          const status = String(row.Status_Lead || row.Status || "").toLowerCase();
+          if (status.includes("closing")) dailyMap[dateKey].closing += 1;
+        }
+      });
+
+      const sortedKeys = Object.keys(dailyMap).sort();
+
+      // Hitung Total untuk 4 Kotak KPI
+      let totalSpend = 0, totalReach = 0, totalImpressions = 0, totalLeads = 0, totalClosing = 0;
+      sortedKeys.forEach(k => {
+        totalSpend += dailyMap[k].spend;
+        totalReach += dailyMap[k].reach;
+        totalImpressions += dailyMap[k].impressions;
+        totalLeads += dailyMap[k].leads;
+        totalClosing += dailyMap[k].closing;
+      });
+
+      // Jika tab Leads_WA memiliki data lebih akurat, sinkronkan
+      if (totalLeads === 0 && filteredLeads.length > 0) {
+        totalLeads = filteredLeads.length;
+        totalClosing = filteredLeads.filter(r => String(r.Status_Lead || r.Status || "").toLowerCase().includes("closing")).length;
+      }
+
+      const cpl = totalLeads > 0 ? (totalSpend / totalLeads) : 0;
+      const convRate = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) : "0.0";
+
+      // Update 4 Kotak KPI
+      document.getElementById('kpiSpend').textContent = formatRupiah(totalSpend);
+      document.getElementById('kpiLeads').textContent = totalLeads.toLocaleString('id-ID');
+      document.getElementById('kpiCPL').textContent = `CPL: ${formatRupiah(cpl)} / lead`;
+      document.getElementById('kpiClosing').textContent = totalClosing.toLocaleString('id-ID');
+      document.getElementById('kpiConvRate').textContent = `Rasio Konversi: ${convRate}%`;
+      document.getElementById('kpiReach').textContent = totalReach.toLocaleString('id-ID');
+      document.getElementById('kpiImpressions').textContent = `Impresi: ${totalImpressions.toLocaleString('id-ID')} tayangan`;
+
+      // Update Ringkasan Singkat di Bawah Grafik
+      document.getElementById('autoSummaryText').innerHTML = 
+        `Pada periode <b>${document.getElementById('labelPeriode').textContent}</b>, total anggaran iklan yang terserap adalah <b>${formatRupiah(totalSpend)}</b> dengan jangkauan <b>${totalReach.toLocaleString('id-ID')} akun</b>. Kampanye menghasilkan <b>${totalLeads} prospek WhatsApp</b> (rata-rata biaya per prospek <b>${formatRupiah(cpl)}</b>) dan membukukan <b>${totalClosing} closing</b> (${convRate}% conversion rate).`;
+
+      // Render Grafik Harian Leads WA vs Closing
+      renderChart(sortedKeys, dailyMap);
+
+      // Render Tabel Detail Rekap Harian
+      renderTableRekapHarian(sortedKeys, dailyMap);
+
+      // Render Tabel Daftar Prospek WA
+      currentFilteredLeads = filteredLeads;
+      renderTableLeadsWA();
+    }
+
+    function renderChart(sortedKeys, dailyMap) {
+      const ctx = document.getElementById('chartLeadsClosing').getContext('2d');
+      const labels = sortedKeys.map(k => {
+        const parts = k.split('-');
+        return parts.length === 3 ? `${parts[2]}/${parts[1]}` : k;
+      });
+      const dataLeads = sortedKeys.map(k => dailyMap[k].leads);
+      const dataClosing = sortedKeys.map(k => dailyMap[k].closing);
+      const dataRate = sortedKeys.map(k => {
+        const l = dailyMap[k].leads, c = dailyMap[k].closing;
+        return l > 0 ? Number(((c / l) * 100).toFixed(1)) : 0;
+      });
+
+      if (leadsChartInstance) leadsChartInstance.destroy();
+
+      leadsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['Belum Ada Data'],
+          datasets: [
+            {
+              label: 'Total Leads WA',
+              data: dataLeads.length ? dataLeads : [0],
+              backgroundColor: '#10b981',
+              borderRadius: 6,
+              barPercentage: 0.6,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Jumlah Closing',
+              data: dataClosing.length ? dataClosing : [0],
+              backgroundColor: '#0f172a',
+              borderRadius: 6,
+              barPercentage: 0.6,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Closing Rate (%)',
+              data: dataRate.length ? dataRate : [0],
+              borderColor: '#f59e0b',
+              backgroundColor: '#fef3c7',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#f59e0b',
+              tension: 0.35,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { backgroundColor: '#0f172a', padding: 10, cornerRadius: 8 }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              ticks: { precision: 0 },
+              title: { display: true, text: 'Jumlah Leads / Closing', font: { size: 11 } },
+              grid: { color: '#f1f5f9' }
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              max: 100,
+              title: { display: true, text: 'Closing Rate (%)', font: { size: 11 } },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTableRekapHarian(sortedKeys, dailyMap) {
+      const tbody = document.getElementById('tableRekapHarianBody');
+      if (sortedKeys.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = sortedKeys.slice().reverse().map(k => {
+        const item = dailyMap[k];
+        const cpl = item.leads > 0 ? formatRupiah(item.spend / item.leads) : "Rp 0";
+        const parts = k.split('-');
+        const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : k;
+
+        return `
+          <tr class="hover:bg-slate-50/80">
+            <td class="py-3 px-4 font-semibold text-slate-800">${formattedDate}</td>
+            <td class="py-3 px-4 text-right font-medium text-slate-700">${formatRupiah(item.spend)}</td>
+            <td class="py-3 px-4 text-right text-slate-600">${item.reach.toLocaleString('id-ID')}</td>
+            <td class="py-3 px-4 text-center text-slate-600">${item.clicks.toLocaleString('id-ID')}</td>
+            <td class="py-3 px-4 text-center font-bold text-emerald-600">${item.leads}</td>
+            <td class="py-3 px-4 text-center font-bold text-amber-600">${item.closing}</td>
+            <td class="py-3 px-4 text-right text-slate-600">${cpl}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderTableLeadsWA() {
+      const tbody = document.getElementById('tableLeadsWABody');
+      const searchVal = (document.getElementById('leadSearchInput').value || '').toLowerCase();
+      const statusFilter = document.getElementById('leadStatusFilter').value;
+
+      const getLead = (row) => {
+        const waktu = row.Waktu_Masuk || ((row.Tanggal_Masuk || row.Tanggal || row.Timestamp) ? `${row.Tanggal_Masuk || row.Tanggal || row.Timestamp} ${row.Jam_Masuk || ''}`.trim() : "");
+        return {
+          id: row.ID_Lead || row.ID || "-",
+          waktu: waktu,
+          nama: row.Nama_Profil_WA || row.Nama_Prospek || row.Nama || "Prospek WA",
+          noWa: String(row.Nomor_WA || row.No_WA || row.Telepon || ""),
+          pesan: row.Pesan_Awal || row.Pesan || "",
+          kode: String(row.Kode_Iklan || row.Sumber_Iklan || "Organik").replace(/^\[|\]$/g, ""),
+          status: row.Status_Lead || row.Status || "Baru Masuk",
+          catatan: row.Nama_CS_Catatan || row["Nama_CS / Catatan"] || row.Catatan_CS || row.Keterangan || "-"
+        };
+      };
+
+      const filtered = currentFilteredLeads.map(getLead).filter(item => {
+        const matchStatus = statusFilter === 'all' || String(item.status).toLowerCase() === statusFilter.toLowerCase();
+        const combinedText = `${item.nama} ${item.noWa} ${item.kode} ${item.pesan}`.toLowerCase();
+        const matchSearch = !searchVal || combinedText.includes(searchVal);
+        return matchStatus && matchSearch;
+      });
+
+      document.getElementById('badgeCountLeads').textContent = `${filtered.length} Prospek`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400">Tidak ada data prospek WhatsApp yang sesuai filter.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.slice().reverse().map(lead => {
+        const status = String(lead.status);
+        let statusBadge = "bg-slate-100 text-slate-700 border-slate-200";
+        if (status.toLowerCase().includes("closing")) statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold";
+        else if (status.toLowerCase().includes("hot")) statusBadge = "bg-amber-50 text-amber-700 border-amber-200 font-semibold";
+        else if (status.toLowerCase().includes("gagal")) statusBadge = "bg-rose-50 text-rose-700 border-rose-200";
+        else if (status.toLowerCase().includes("follow up")) statusBadge = "bg-blue-50 text-blue-700 border-blue-200";
+
+        const cleanWa = lead.noWa.replace(/\D/g, "");
+        const waCell = cleanWa
+          ? `<a href="https://wa.me/${cleanWa}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700">
+                <span>+${cleanWa}</span>
+                <span class="text-[10px] underline no-print">(Klik Chat)</span>
+              </a>`
+          : `<span class="text-xs text-slate-400">-</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-4 whitespace-nowrap">
+              <div class="font-mono text-xs font-semibold text-slate-700">${lead.id}</div>
+              <div class="text-[11px] text-slate-400">${lead.waktu || "-"}</div>
+            </td>
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-900">${lead.nama}</div>
+              ${waCell}
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">[${lead.kode}]</span>
+            </td>
+            <td class="py-3 px-4 max-w-xs">
+              <p class="text-xs text-slate-600 line-clamp-2" title="${lead.pesan}">${lead.pesan ? '"' + lead.pesan + '"' : "-"}</p>
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border ${statusBadge}">${status}</span>
+            </td>
+            <td class="py-3 px-4 text-xs text-slate-600">
+              ${lead.catatan}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Fungsi Download PDF dengan 3 Pilihan Opsi
+    function downloadPDF() {
+      const exportType = document.getElementById('pdfExportType').value;
+      const sectionReport = document.getElementById('sectionReportAndChart');
+      const sectionLeads = document.getElementById('sectionLeadsWA');
+
+      // Sembunyikan bagian yang tidak dipilih sementara waktu
+      if (exportType === 'report_chart') {
+        sectionLeads.style.display = 'none';
+      } else if (exportType === 'leads_only') {
+        sectionReport.style.display = 'none';
+      }
+
+      const element = document.getElementById('reportArea');
+      element.classList.add('pdf-export-mode');
+      const periodeLabel = document.getElementById('labelPeriode').textContent.replace(/\s+/g, '_');
+      const opt = {
+        margin:       [8, 8, 8, 8],
+        filename:     `Laporan_Meta_Ads_Leads_WA_${periodeLabel}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        // Kembalikan tampilan semula setelah PDF selesai diunduh
+        element.classList.remove('pdf-export-mode');
+        sectionReport.style.display = '';
+        sectionLeads.style.display = '';
+      });
+    }
+
+    // Data Pratinjau Otomatis Jika URL Belum Diisi
+    function loadSampleFallbackData() {
+      const today = new Date();
+      const fmt = (d) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      
+      rawData.rekap_monitor = [
+        { Waktu_Update: fmt(today), Spend_Hari_Ini: 175000, Reach: 4200, Impressions: 6800, Link_Clicks: 94 },
+        { Waktu_Update: fmt(new Date(today - 86400000)), Spend_Hari_Ini: 160000, Reach: 3900, Impressions: 5900, Link_Clicks: 81 }
+      ];
+      rawData.rekap_harian = [
+        { Tanggal: fmt(today), Total_Spend: 175000, Reach: 4200, Leads_Masuk: 9, Total_Closing: 2 },
+        { Tanggal: fmt(new Date(today - 86400000)), Total_Spend: 160000, Reach: 3900, Leads_Masuk: 7, Total_Closing: 1 }
+      ];
+      rawData.leads_wa = [
+        { Waktu_Masuk: fmt(today) + " 09:40", Nama_Prospek: "Budi Santoso", No_WA: "081234567890", Kode_Iklan: "[VID-01]", Status_Lead: "Closing", Catatan_CS: "Booking unit blok A3" },
+        { Waktu_Masuk: fmt(today) + " 10:15", Nama_Prospek: "Siti Rahma", No_WA: "085712345678", Kode_Iklan: "[VID-02]", Status_Lead: "Hot Prospect", Catatan_CS: "Jadwal survei lokasi besok" }
+      ];
+    }
+  </script>
+</body>
+</html>
